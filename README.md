@@ -1,2 +1,2 @@
 # Interaction Holling
-## Aurthor
+## Author
