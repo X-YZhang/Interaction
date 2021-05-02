@@ -1,22 +1,22 @@
-#DDHR equation mapping
+
 init.est<-function(dat){
   times <- dat$sample_times
   epp<-dat$ep.p
   spp<-dat$sp.p
   ty <- cbind(epp,spp)
   cm <- as.numeric(colMeans(ty))
-  sum.curve<-function(par10){
-    # if(par10[1]<0||par10[4]<0||par10[2]<0||par10[5]<0){A<-exp(500)}
-    # else{A <- sum((cm-com.get_mu(par10,times,cm[1],cm[16]))^2)}
-    A <- sum((cm-com.get_mu(par10,times,cm[1],cm[16]))^2)
+  sum.curve<-function(par6){
+    y<-com.get_mu1(par6[c(1,2,4,5)],times,x0=cm[1]/2,y0=cm[17]/2)+
+      com.get_mu2(par6[c(1,3,4,6)],times,x0=cm[1]/2,y0=cm[17]/2)
+    A <- sum((cm-y)^2)
     A
   }
-  init.par<-c(0.5,26,-0.1,0.5,23,-0.1)
+  init.par<-c(0.5,23,-2,0.5,20,-2)
   a<-optim(init.par,sum.curve,method = "Nelder-Mead",control = list(maxit=1500))
   return(a$par)
 }
 
-#par0<-init.est(dat)#0.3093241 36.2672832 -0.4099639  0.1299749 30.9360561 -0.2711620
+#par0<-init.est(dat)#0.4656164 22.6689926 -1.9603047  0.4641400 20.7590245 -1.9604165
 
 curve.mlefunc<-function( par, y, time.std,x0,y0)
 {
@@ -28,7 +28,8 @@ curve.mlefunc<-function( par, y, time.std,x0,y0)
   n  <- length(y[,1]);
   
   par1 <- par[-c(1:len.cov)]
-  mu0 <- com.get_mu(par1,time.std,x0,y0)
+  mu0 <- com.get_mu1(par1[c(1,2,4,5)],times,x0,y0)+
+    com.get_mu2(par1[c(1,3,4,6)],times,x0,y0)
   
   fy0<- dmvnorm(y,mu0,sig)
   A <- -sum(log(fy0));
@@ -46,16 +47,9 @@ H0.est<-function(dat){
   ms <- colMeans(spp)
   mpheno<-as.numeric(c(me,ms))
   
-  sum.curve<-function(par10){
-    A <- sum((mpheno-com.get_mu(par10,times,mpheno[1],mpheno[16]))^2)
-    A
-  }
-  
-  #init.par<-c(0.313332791,36.844761470,-0.422638409,0.107152723,21.334953314,-0.006076495)
-  init.par<-c(0.3093241,36.2672832,-0.4099639,0.1299749,30.9360561,-0.2711620)
-  a<-optim(init.par,sum.curve,method = "Nelder-Mead",control = list(maxit=1500))
+  par<-c(0.4656164, 22.6689926, -1.9603047,  0.4641400, 20.7590245, -1.9604165)
   covar.par<-c(0.5,sd(as.matrix(epp)),0.5,sd(as.matrix(spp)),0.5)
-  parin<-c(covar.par,a$par)
+  parin<-c(covar.par,par)
   
   loop_k <- 1
   max_iter <- 100
@@ -66,7 +60,7 @@ H0.est<-function(dat){
     mle.covar1 <- function(npar){
       
       nnpar <- c(npar,parin[6:11])
-      AA <- curve.mlefunc(nnpar,y=allpheno,time.std =times,x0=mpheno[1],y0=mpheno[16])
+      AA <- curve.mlefunc(nnpar,y=allpheno,time.std =times,x0=mpheno[1]/2,y0=mpheno[17]/2)
       AA
     }
     r1.covar <- optim(parin[1:5],mle.covar1,method = "BFGS",control=list(maxit=32000))
@@ -75,10 +69,10 @@ H0.est<-function(dat){
     mle.1 <- function(npar){
       
       nnpar <- c(new.covar1,npar)
-      AA <- curve.mlefunc(nnpar,y=allpheno,time.std =times,x0=mpheno[1],y0=mpheno[16])
+      AA <- curve.mlefunc(nnpar,y=allpheno,time.std =times,x0=mpheno[1]/2,y0=mpheno[17]/2)
       AA
     }
-    r1 <- optim(c(parin[6:11]),mle.1,method = "BFGS",control=list(maxit=32000))    
+    r1 <- optim(c(parin[6:11]),mle.1,method = "Nelder-Mead",control=list(maxit=32000))    
     new1 <- r1$par
     nparin <- c(new.covar1,new1)
     
@@ -90,11 +84,11 @@ H0.est<-function(dat){
     
     loop_k <- loop_k+1; 
   }
-  LL <- curve.mlefunc(parin2,y=allpheno,time.std =times,x0=mpheno[1],y0=mpheno[16])
+  LL <- curve.mlefunc(parin2,y=allpheno,time.std =times,x0=mpheno[1]/2,y0=mpheno[17]/2)
   return(c(parin2,LL))
 }
 # H0<-H0.est(dat)
-# load("H0-1.RData")
+# load("H0.RData")
 
 ES.mlefunc<-function( par, y, time.std,snp.index )
 {
@@ -109,8 +103,8 @@ ES.mlefunc<-function( par, y, time.std,snp.index )
   for(k in 1:length(snp.index)){
     gen_par<- par[(len.cov+1+len):(len.cov+ 6+len)];
     yy0 <- y[snp.index[[k]],]
-    myy0 <- as.numeric(colMeans(yy0))
-    mu0 <- com.get_mu( gen_par, time.std,x0=myy0[1],y0=myy0[16]);
+    mu0 <- com.get_mu1(gen_par[c(1,2,4,5)],time.std,4.258597,4.258597)+
+      com.get_mu2(gen_par[c(1,3,4,6)],time.std,4.258597,4.258597);
     fy0 <- dmvnorm(yy0,mu0,sig)
     A <- A -sum(log(fy0));
     len <- len + 6
@@ -129,11 +123,12 @@ H1.est <- function(y11,y22,SNP1,init.par=h01,times){
   for(j in 1:length(snp.type)){
     index <- which(SNP1==snp.type[j])
     yy <- as.numeric(colMeans(phenos[index,]))
-    sum.curve<-function(par10){
-      A <- sum((yy-com.get_mu(par10,times,yy[1],yy[16]))^2)
+    sum.curve<-function(par6){
+      y<-com.get_mu1(par6[c(1,2,4,5)],times,x0=4.258597,y0=4.258597)+
+        com.get_mu2(par6[c(1,3,4,6)],times,x0=4.258597,y0=4.258597)
+      A <- sum((yy-y)^2)
       A
     }
-    
     r1<-optim(H0[6:11],sum.curve,method = "Nelder-Mead",control = list(maxit=1500))
     snp.index[[j]] <- index
     g.par <- c(g.par,r1$par)
@@ -162,7 +157,7 @@ H1.est <- function(y11,y22,SNP1,init.par=h01,times){
       AA <- ES.mlefunc(nnpar,y=phenos,time.std =times,snp.index)
       AA
     }
-    r1.g <- optim(c(parin[-(1:5)]),mle1.g,method = "BFGS",control=list(maxit=32000))
+    r1.g <- optim(c(parin[-(1:5)]),mle1.g,method = "Nelder-Mead",control=list(maxit=32000))
     #cat("r1.g:",unlist(r1.g$par), "\n");
     
     newpar <- c(new.covar1,r1.g$par)
@@ -178,7 +173,7 @@ H1.est <- function(y11,y22,SNP1,init.par=h01,times){
 }
 
 
-com.DH.est1 <- function(dat,interval=c(1,75168)){
+com.DH.est1 <- function(dat,interval=c(1,40054)){
   
   y1 <- as.matrix( dat$ep.p)
   y2 <- as.matrix( dat$sp.p)
@@ -194,24 +189,21 @@ com.DH.est1 <- function(dat,interval=c(1,75168)){
   
   for(i in n1:n2){
     SNP <- geno_table[i,]
-    missing <- which(is.na(SNP))
-    if ( length(missing) > 0)
-    {
-      SNP1 <- SNP[-(missing)]
-      y11 <- y1[ -(missing), ]
-      y22 <- y2[ -(missing), ]
-    }else{
-      SNP1 <- SNP
-      y11 <- y1
-      y22 <- y2
-    }
+    # missing <- which(is.na(SNP))
+    # if ( length(missing) > 0)
+    # {
+    #   SNP1 <- SNP[-(missing)]
+    #   y11 <- y1[ -(missing), ]
+    #   y22 <- y2[ -(missing), ]
+    # }else{
+    #   SNP1 <- SNP
+    #   y11 <- y1
+    #   y22 <- y2
+    # }
     
-    ndat <- dat
-    ndat$ep.p <- y11
-    ndat$sp.p <- y22
     h01 <- H0#没有NA不用重复计算
     
-    h02 <- try(H1.est(y11,y22,SNP1,init.par=h01,times),TRUE)
+    h02 <- try(H1.est(y1,y2,SNP,init.par=h01,times),TRUE)
     if (class(h02) == "try-error") 
       h02 <- NA
     LR <- 2*(h01[12]-h02[1])

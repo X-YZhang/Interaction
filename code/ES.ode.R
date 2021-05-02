@@ -1,6 +1,5 @@
-#equation: Gompertz;logistic;Richards;DDHR
-require("deSolve")
 
+require("deSolve")
 G.get_mu <- function(par, times, options=list())
 {
   A <- par[1]*exp(-exp(par[2]-par[3]*times))
@@ -33,6 +32,7 @@ R.mle <- function(par,y,times){
   
   sum((y-R.get_mu(par,times))^2)
 }
+
 
 s.mle <- function(s.par,s.y,s.t,x0,y0){
   A <- sum((s.y - com.get_mu(s.par,s.t,x0,y0))^2 )
